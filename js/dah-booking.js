@@ -178,36 +178,48 @@ fetchAvailability(from, to, instance)
       // }
 
       let dynamicDepositPercent = depositPercent ?? null;
+      let dynamicDepositDays    = depositDays ?? null;
 
       // Optional: fallback if API fails
-        const fallbackDepositPercent = 0;
+      const fallbackDepositPercent = 0;
+      const fallbackDepositDays    = 0;
 
-        /**
-        * Fetch the deposit policy (if not already available)
-        * Returns a Promise
-        */
-        function fetchDepositPercent() {
-          return $.getJSON(`${restBase}/property/${propertyId}`)
-            .then(data => {
-              try {
-                const dp = parseFloat(data.autoPayments.policy[0].amount);
-                if (!isNaN(dp)) {
-                  dynamicDepositPercent = dp;
-                  console.log(`Fetched dynamic depositPercent: ${dp}%`);
-                } else {
-                  console.warn('Deposit amount missing in response. Fallback used.');
-                  dynamicDepositPercent = fallbackDepositPercent;
-                }
-              } catch (err) {
-                console.error('Error parsing deposit policy:', err);
+      /**
+       * Fetch the deposit policy (if not already available)
+       * Returns a Promise
+       */
+      function fetchDepositPercent() {
+        return $.getJSON(`${restBase}/paymentpolicy`, { propertyId })
+          .then(data => {
+            try {
+              const policy = data.autoPayments && data.autoPayments.policy;
+              const dp = parseFloat(policy?.[0]?.amount);
+              if (!isNaN(dp)) {
+                dynamicDepositPercent = dp;
+                console.log(`Fetched dynamic depositPercent: ${dp}%`);
+              } else {
+                console.warn('Deposit amount missing in response. Fallback used.');
                 dynamicDepositPercent = fallbackDepositPercent;
               }
-            })
-            .catch(err => {
-              console.error('Failed to fetch deposit policy:', err);
+
+              const dd = parseInt(policy?.[1]?.scheduleTo?.timeRelation?.amount);
+              if (!isNaN(dd)) {
+                dynamicDepositDays = dd;
+              } else {
+                dynamicDepositDays = fallbackDepositDays;
+              }
+            } catch (err) {
+              console.error('Error parsing deposit policy:', err);
               dynamicDepositPercent = fallbackDepositPercent;
-            });
-        }
+              dynamicDepositDays    = fallbackDepositDays;
+            }
+          })
+          .catch(err => {
+            console.error('Failed to fetch deposit policy:', err);
+            dynamicDepositPercent = fallbackDepositPercent;
+            dynamicDepositDays    = fallbackDepositDays;
+          });
+      }
 
 
       function processSelection(){
@@ -251,8 +263,7 @@ fetchAvailability(from, to, instance)
 
             total += cleaningFeeOnce;
             console.log(`Final total (with one-time cleaning fee): ${currency}${total.toFixed(0)}`);
-            // const deposit = total * (depositPercent / 100);
-            const deposit = total * (30 / 100);
+            const deposit = total * (dynamicDepositPercent / 100);
             $('.deposit_percent').text(dynamicDepositPercent);
             console.log(`Deposit (${dynamicDepositPercent}%): ${currency}${deposit.toFixed(0)}`);
             console.groupEnd();
@@ -319,7 +330,7 @@ fetchAvailability(from, to, instance)
           departureDate: endDate,
           depositPercent: dynamicDepositPercent,
           nights,
-          depositDays,
+          depositDays: dynamicDepositDays,
           propertyThumbnail
         };
         $.post(ajaxUrl,{
@@ -333,7 +344,7 @@ fetchAvailability(from, to, instance)
           const qs = '?order='              + encodeURIComponent(JSON.stringify(order)) +
                      '&propertyThumbnail=' + encodeURIComponent(propertyThumbnail) +
                      '&depositPercent='    + dynamicDepositPercent +
-                     '&depositDays='       + depositDays;
+                     '&depositDays='       + dynamicDepositDays;
           window.location.href = prepaymentUrl + qs;
         });
       });
