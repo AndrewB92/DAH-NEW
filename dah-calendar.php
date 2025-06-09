@@ -10,6 +10,28 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Debug constant; define true to enable verbose output
+if ( ! defined( 'DAH_BOOKING_DEBUG' ) ) {
+    define( 'DAH_BOOKING_DEBUG', false );
+}
+
+/**
+ * Helper to output debug data to the frontend when DAH_BOOKING_DEBUG is true.
+ *
+ * @param string $label
+ * @param mixed  $data
+ */
+function dah_debug_output( $label, $data ) {
+    if ( ! DAH_BOOKING_DEBUG ) {
+        return;
+    }
+
+    echo '<div class="dah-debug" style="background:#f6f8fa;border:1px dashed #ccc;padding:10px;margin:10px 0;">';
+    echo '<strong>' . esc_html( $label ) . '</strong>';
+    echo '<pre style="overflow:auto;">' . esc_html( print_r( $data, true ) ) . '</pre>';
+    echo '</div>';
+}
+
 /**
  * 0) On init, pull ?order, ?propertyThumbnail, ?depositPercent, ?depositDays
  *    into cookies + $_COOKIE.
@@ -19,12 +41,19 @@ add_action( 'init', function(){
         $json = urldecode( stripslashes( $_GET['order'] ) );
         setcookie( 'order', $json, time() + HOUR_IN_SECONDS, '/' );
         $_COOKIE['order'] = $json;
+        if ( DAH_BOOKING_DEBUG ) {
+            error_log( 'Init captured order param: ' . $json );
+            dah_debug_output( 'Order Param', json_decode( $json, true ) );
+        }
     }
     foreach ( [ 'propertyThumbnail', 'depositPercent', 'depositDays' ] as $p ) {
         if ( ! empty( $_GET[ $p ] ) ) {
             $val = urldecode( stripslashes( $_GET[ $p ] ) );
             setcookie( $p, $val, time() + HOUR_IN_SECONDS, '/' );
             $_COOKIE[ $p ] = $val;
+            if ( DAH_BOOKING_DEBUG ) {
+                error_log( "Init captured {$p} param: " . $val );
+            }
         }
     }
 });
@@ -131,6 +160,18 @@ add_shortcode( 'dah_booking_calendar', function() {
       </div>
     </div>
     <?php
+    dah_debug_output( 'Calendar Shortcode', [
+        'post_id'         => $post_id,
+        'propertyId'      => $pid,
+        'title'           => $title,
+        'basePrice'       => $base,
+        'minNights'       => $minN,
+        'maxNights'       => $maxN,
+        'depositPercent'  => $depPct,
+        'depositDays'     => $depDays,
+        'thumbnail'       => $thumb,
+        'securityDeposit' => $securityDeposit,
+    ] );
     return ob_get_clean();
 });
 
@@ -181,6 +222,12 @@ function dah_save_order_handler() {
     }
     $o = wp_unslash( $_POST['order'] );
     setcookie( 'order', $o, time() + HOUR_IN_SECONDS, '/' );
+
+    if ( DAH_BOOKING_DEBUG ) {
+        error_log( 'dah_save_order_handler received order: ' . $o );
+        dah_debug_output( 'Saved Order', json_decode( $o, true ) );
+    }
+
     wp_send_json_success();
 }
 add_action( 'wp_ajax_nopriv_dah_save_order', 'dah_save_order_handler' );
@@ -391,19 +438,18 @@ add_shortcode( 'dah_booking_prepayment', function() {
 
               </div>
             </div>
-            <?
-              echo 'deposit_value='.get_post_meta( $realPostId, 'security_deposit_fee', true ).'</br>';
-              
-              echo 'realPostId='.$realPostId.'</br>';
-              echo 'price='.$price.'</br>';
-              echo 'depAmt='.$depAmt.'</br>';
-              echo 'secDep='.$securityDeposit.'</br>';
-
-              echo 'img='.$thumb.'</br>';
-              
-              echo 'from='.$from.'</br>';
-              echo 'to='.$to.'</br>';
-              ?>
+            <?php
+              dah_debug_output( 'Prepayment Variables', [
+                'deposit_value' => get_post_meta( $realPostId, 'security_deposit_fee', true ),
+                'realPostId'    => $realPostId,
+                'price'         => $price,
+                'depAmt'        => $depAmt,
+                'secDep'        => $securityDeposit,
+                'img'           => $thumb,
+                'from'          => $from,
+                'to'            => $to,
+              ] );
+            ?>
 
 <?php
 if ( isset($_COOKIE['order']) ) {
@@ -529,6 +575,16 @@ if ( isset($_COOKIE['order']) ) {
       </div><!-- /.row -->
     </div><!-- /.container -->
     <?php
+    dah_debug_output( 'Prepayment Shortcode', [
+        'order'            => $o,
+        'realPostId'       => $realPostId,
+        'securityDeposit'  => $securityDeposit,
+        'price'            => $price,
+        'depAmt'           => $depAmt,
+        'thumbnail'        => $thumb,
+        'from'             => $from,
+        'to'               => $to,
+    ] );
     return ob_get_clean();
 });
 
@@ -595,6 +651,15 @@ add_shortcode( 'dah_payment', function(){
       </div>
     </div>
     <?php
+    dah_debug_output( 'Payment Shortcode', [
+        'order'       => $d,
+        'depositPct'  => $pct,
+        'depAmt'      => $depAmt,
+        'price'       => $price,
+        'thumbnail'   => $thumb,
+        'from'        => $from,
+        'to'          => $to,
+    ] );
     return ob_get_clean();
 });
 
@@ -604,8 +669,8 @@ add_action( 'rest_api_init', function(){
     'permission_callback' => '__return_true',
     'callback'            => function( WP_REST_Request $req ){
       $pid   = sanitize_text_field( $req->get_param('propertyId') );
-      $url   = "https://open-api.guesty.com/v1/listings/{$pid}/paymentPolicy"; 
-      $token = glj_get_guesty_token(); 
+      $url   = "https://open-api.guesty.com/v1/listings/{$pid}/paymentPolicy";
+      $token = glj_get_guesty_token();
       $res   = wp_remote_get( $url, [
         'headers'=>[
           'Authorization'=>"Bearer {$token}",
@@ -614,9 +679,15 @@ add_action( 'rest_api_init', function(){
         'timeout'=>15
       ]);
       if ( is_wp_error($res) ) {
+        if ( DAH_BOOKING_DEBUG ) {
+          error_log( 'paymentpolicy API error: ' . $res->get_error_message() );
+        }
         return new WP_Error( 'api_error', $res->get_error_message(), [ 'status'=>500 ] );
       }
       $data = json_decode( wp_remote_retrieve_body($res), true );
+      if ( DAH_BOOKING_DEBUG ) {
+        dah_debug_output( 'paymentpolicy response', $data );
+      }
       return rest_ensure_response( $data );
     }
   ]);

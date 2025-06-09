@@ -5,6 +5,7 @@
   $(function(){
 
     if ( typeof DAHBooking === 'undefined' ) return;
+    console.log('DAHBooking config', DAHBooking);
 
     const {
       restBase, ajaxUrl, propertyId, propertyName,
@@ -322,6 +323,8 @@ fetchAvailability(from, to, instance)
           depositDays,
           propertyThumbnail
         };
+        console.log('Submitting order', order);
+        window.DAHLastOrder = order;
         $.post(ajaxUrl,{
           action:'dah_save_order',
           order: JSON.stringify(order)
@@ -356,6 +359,8 @@ fetchAvailability(from, to, instance)
           JSON.parse(decodeURIComponent(raw)),
           formData
         );
+        console.log('Submitting booking form', booking);
+        window.DAHLastBooking = booking;
         fetch('/api/customer_sales_intent_email',{
           method:'POST',
           body: JSON.stringify(booking)
