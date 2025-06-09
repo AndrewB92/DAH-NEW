@@ -391,48 +391,7 @@ add_shortcode( 'dah_booking_prepayment', function() {
 
               </div>
             </div>
-            <?
-              echo 'deposit_value='.get_post_meta( $realPostId, 'security_deposit_fee', true ).'</br>';
-              
-              echo 'realPostId='.$realPostId.'</br>';
-              echo 'price='.$price.'</br>';
-              echo 'depAmt='.$depAmt.'</br>';
-              echo 'secDep='.$securityDeposit.'</br>';
 
-              echo 'img='.$thumb.'</br>';
-              
-              echo 'from='.$from.'</br>';
-              echo 'to='.$to.'</br>';
-              ?>
-
-<?php
-if ( isset($_COOKIE['order']) ) {
-    echo '<div style="background:#f6f8fa;padding:20px;border:1px solid #ccc;margin:20px 0;">';
-    echo '<h4>🧾 Order Data (Debug Output)</h4>';
-    
-    $raw_order = rawurldecode( $_COOKIE['order'] );
-    $order = json_decode( $raw_order, true );
-    
-    if ( json_last_error() === JSON_ERROR_NONE ) {
-        echo '<ul style="list-style-type:disc;padding-left:20px;">';
-        foreach ( $order as $key => $value ) {
-            // Handle arrays/nested values
-            if ( is_array($value) ) {
-                echo "<li><strong>{$key}:</strong><pre>" . print_r($value, true) . "</pre></li>";
-            } else {
-                echo "<li><strong>{$key}:</strong> " . esc_html($value) . "</li>";
-            }
-        }
-        echo '</ul>';
-    } else {
-        echo '<p style="color:red;">Error decoding order JSON: ' . json_last_error_msg() . '</p>';
-    }
-
-    echo '</div>';
-} else {
-    echo '<p>No order cookie found.</p>';
-}
-?>
 
 
 <div class="deposit-info">
